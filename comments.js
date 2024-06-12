@@ -1,80 +1,39 @@
-// create web server
-// http://localhost:3000/comments
+// Create web server
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const url = require('url');
 
-// import express
-const express = require('express')
-const app = express()
+const comments = require('./comments');
 
-// import comment model
-// what would the models/comment.js file look like using json and js?
-const Comment = require('../models/comment')
+const server = http.createServer((req, res) => {
+  const parsedUrl = url.parse(req.url, true);
+  const parsedPath = parsedUrl.pathname;
+  const parsedQuery = parsedUrl.query;
 
-// create a new comment
-app.post('/comments', async (req, res) => {
-    const comment = new Comment(req.body)
-    try {
-        await comment.save()
-        res.status(201).send(comment)
-    } catch (e) {
-        res.status(400).send(e)
+  if (parsedPath === '/comments') {
+    if (req.method === 'GET') {
+      const data = "comments section";
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } else if (req.method === 'POST') {
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk;
+      });
+      req.on('end', () => {
+        const parsedBody = JSON.parse(body);
+        comments.addComment(parsedBody);
+        res.writeHead(201, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(parsedBody));
+      });
     }
-})
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found!');
+  }
+});
 
-// get all comments
-app.get('/comments', async (req, res) => {
-    try {
-        const comments = await Comment.find({})
-        res.send(comments)
-    } catch (e) {
-        res.status(500).send()
-    }
-})
-
-// get a comment by id
-app.get('/comments/:id', async (req, res) => {
-    const _id = req.params.id
-    try {
-        const comment = await Comment.findById(_id)
-        if (!comment) {
-            return res.status(404).send()
-        }
-        res.send(comment)
-    } catch (e) {
-        res.status(500).send()
-    }
-})
-
-// update a comment by id
-app.patch('/comments/:id', async (req, res) => {
-    const updates = Object.keys(req.body)
-    const allowedUpdates = ['content']
-    const isValidOperation = updates.every((update) => allowedUpdates.includes(update))
-    if (!isValidOperation) {
-        return res.status(400).send({ error: 'Invalid updates!' })
-    }
-    try {
-        const comment = await Comment.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true })
-        if (!comment) {
-            return res.status(404).send()
-        }
-        res.send(comment)
-    } catch (e) {
-        res.status(400).send(e)
-    }
-})
-
-// delete a comment by id
-app.delete('/comments/:id', async (req, res) => {
-    try {
-        const comment = await Comment.findByIdAndDelete(req.params.id)
-        if (!comment) {
-            return res.status(404).send()
-        }
-        res.send(comment)
-    } catch (e) {
-        res.status(500).send()
-    }
-})
-
-// export the module
-module.exports = app
+server.listen(3000, () => {
+  console.log('Server is listening on port 3000');
+});
